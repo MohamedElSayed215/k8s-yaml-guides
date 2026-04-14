@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kubectl --dry-run Cheat Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e0e10;
+  --bg2: #18181c;
+  --bg3: #222228;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #e8e8f0;
+  --text2: #9090a8;
+  --text3: #5a5a72;
+  --accent: #7c6aff;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+
+  --c-blue:   #3b82f6;
+  --c-teal:   #14b8a6;
+  --c-amber:  #f59e0b;
+  --c-coral:  #f97316;
+  --c-purple: #a78bfa;
+  --c-green:  #22c55e;
+
+  --c-blue-bg:   rgba(59,130,246,0.12);
+  --c-teal-bg:   rgba(20,184,166,0.12);
+  --c-amber-bg:  rgba(245,158,11,0.12);
+  --c-coral-bg:  rgba(249,115,22,0.12);
+  --c-purple-bg: rgba(167,139,250,0.12);
+  --c-green-bg:  rgba(34,197,94,0.12);
+}
+
+[data-theme="light"] {
+  --bg: #f4f4f7;
+  --bg2: #ffffff;
+  --bg3: #ebebf0;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --text: #18181c;
+  --text2: #5a5a72;
+  --text3: #9090a8;
+  --c-blue-bg:   rgba(59,130,246,0.1);
+  --c-teal-bg:   rgba(20,184,166,0.1);
+  --c-amber-bg:  rgba(245,158,11,0.1);
+  --c-coral-bg:  rgba(249,115,22,0.1);
+  --c-purple-bg: rgba(167,139,250,0.1);
+  --c-green-bg:  rgba(34,197,94,0.1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ── Header ── */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -1px;
+}
+
+.logo-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.logo-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.search-wrap {
+  flex: 1;
+  position: relative;
+  max-width: 360px;
+}
+
+.search-wrap svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text3);
+  pointer-events: none;
+}
+
+#search {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 12px 8px 34px;
+  color: var(--text);
+  outline: none;
+  transition: border-color .2s;
+}
+
+#search::placeholder { color: var(--text3); }
+#search:focus { border-color: var(--accent); }
+
+.header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+.btn-icon {
+  width: 36px; height: 36px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text2);
+  transition: background .15s, color .15s;
+  font-size: 16px;
+}
+.btn-icon:hover { background: var(--bg3); color: var(--text); }
+
+/* ── Layout ── */
+.layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  gap: 0;
+}
+
+/* ── Sidebar ── */
+nav {
+  padding: 24px 16px 24px 0;
+  position: sticky;
+  top: 65px;
+  height: calc(100vh - 65px);
+  overflow-y: auto;
+}
+
+.nav-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 0 8px;
+  margin: 0 0 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  transition: background .15s, color .15s;
+  text-decoration: none;
+}
+.nav-item:hover { background: var(--bg3); color: var(--text); }
+.nav-item.active { background: rgba(124,106,255,0.15); color: var(--accent); }
+
+.nav-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.nav-sep { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* ── Main Content ── */
+main { padding: 24px 0 60px 24px; border-left: 1px solid var(--border); }
+
+.section { margin-bottom: 40px; scroll-margin-top: 80px; }
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+
+.section-line { flex: 1; height: 1px; background: var(--border); }
+
+/* ── Card ── */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.card:hover { border-color: var(--border2); }
+.card.hidden { display: none; }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+}
+.card-header:hover { background: var(--bg3); }
+
+.badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.obj-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 100px;
+}
+
+.obj-desc {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text2);
+  flex: 1;
+}
+
+.chevron {
+  color: var(--text3);
+  font-size: 11px;
+  transition: transform .2s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.card.open .chevron { transform: rotate(180deg); }
+
+.card-body {
+  display: none;
+  padding: 14px 16px 16px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+.card.open .card-body { display: block; }
+
+/* ── Command Block ── */
+.cmd-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin: 0 0 6px;
+  margin-top: 14px;
+}
+.cmd-label:first-child { margin-top: 0; }
+
+.cmd-block {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 40px 10px 14px;
+  margin-bottom: 4px;
+  position: relative;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+.kw  { color: var(--c-blue); }
+.fl  { color: var(--c-amber); }
+.val { color: var(--c-green); }
+
+.copy-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text3);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: color .15s, background .15s;
+  white-space: nowrap;
+}
+.copy-btn:hover { color: var(--text); background: var(--border2); }
+.copy-btn.copied { color: var(--c-green); }
+
+/* ── Flags ── */
+.flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.flag-pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  color: var(--text2);
+}
+
+.flag-key { color: var(--c-amber); font-weight: 500; }
+
+/* ── Note ── */
+.note {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--border2);
+  line-height: 1.6;
+  font-family: var(--mono);
+}
+.note code {
+  color: var(--text2);
+  font-size: 11.5px;
+}
+
+/* ── Badge colors ── */
+.b-blue   { background: var(--c-blue-bg);   color: var(--c-blue);   }
+.b-teal   { background: var(--c-teal-bg);   color: var(--c-teal);   }
+.b-amber  { background: var(--c-amber-bg);  color: var(--c-amber);  }
+.b-coral  { background: var(--c-coral-bg);  color: var(--c-coral);  }
+.b-purple { background: var(--c-purple-bg); color: var(--c-purple); }
+.b-green  { background: var(--c-green-bg);  color: var(--c-green);  }
+
+/* ── Dot colors ── */
+.d-blue   { background: var(--c-blue); }
+.d-teal   { background: var(--c-teal); }
+.d-amber  { background: var(--c-amber); }
+.d-coral  { background: var(--c-coral); }
+.d-purple { background: var(--c-purple); }
+.d-green  { background: var(--c-green); }
+
+/* ── Pro Tip ── */
+.tip-card {
+  background: rgba(124,106,255,0.07);
+  border: 1px solid rgba(124,106,255,0.25);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.tip-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.tip-card .cmd-block {
+  background: var(--bg);
+}
+.tip-note {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 10px;
+  line-height: 1.6;
+}
+
+/* ── Empty state ── */
+#empty {
+  display: none;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text3);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .layout { grid-template-columns: 1fr; }
+  nav { display: none; }
+  main { padding: 16px 0 40px; border-left: none; }
+  .logo-sub { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">k8s</div>
+    <span class="logo-text">kubectl</span>
+    <span class="logo-sub">--dry-run=client -o yaml</span>
+  </div>
+  <div class="search-wrap">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="search" placeholder="Search objects or flags…" autocomplete="off">
+  </div>
+  <div class="header-actions">
+    <button class="btn-icon" id="theme-btn" title="Toggle theme">☀</button>
+    <button class="btn-icon" id="expand-btn" title="Expand all">⊞</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <nav>
+    <div class="nav-label">Sections</div>
+    <a class="nav-item" href="#workloads"><span class="nav-dot d-blue"></span>Workloads</a>
+    <a class="nav-item" href="#networking"><span class="nav-dot d-amber"></span>Networking</a>
+    <a class="nav-item" href="#config"><span class="nav-dot d-coral"></span>Config &amp; Storage</a>
+    <a class="nav-item" href="#rbac"><span class="nav-dot d-purple"></span>RBAC</a>
+    <a class="nav-item" href="#namespace"><span class="nav-dot d-green"></span>Namespace &amp; Quota</a>
+    <div class="nav-sep"></div>
+    <a class="nav-item" href="#tip"><span class="nav-dot" style="background:var(--accent)"></span>Pro Tip</a>
+  </nav>
+
+  <main>
+
+    <!-- ── Workloads ── -->
+    <section class="section" id="workloads">
+      <div class="section-header">
+        <span class="section-title">Workloads</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="card" data-tags="pod run container image restart">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-blue">Pod</span>
+          <span class="obj-name">pod</span>
+          <span class="obj-desc">Single container unit</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl run</span> <span class="val">my-pod</span> <span class="fl">--image</span>=nginx <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--image</span>=nginx</span>
+            <span class="flag-pill"><span class="flag-key">--port</span>=80</span>
+            <span class="flag-pill"><span class="flag-key">--env</span>="KEY=val"</span>
+            <span class="flag-pill"><span class="flag-key">--labels</span>="app=web"</span>
+            <span class="flag-pill"><span class="flag-key">--restart</span>=Never</span>
+            <span class="flag-pill"><span class="flag-key">--command</span> -- sleep 3600</span>
+            <span class="flag-pill"><span class="flag-key">--requests</span>="cpu=100m"</span>
+            <span class="flag-pill"><span class="flag-key">--limits</span>="memory=128Mi"</span>
+          </div>
+          <p class="note">Add <code>--restart=Never</code> to create a bare Pod instead of a Deployment.</p>
+        </div>
+      </div>
+
+      <div class="card" data-tags="deployment deploy replicas rollout image">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-blue">Deployment</span>
+          <span class="obj-name">deployment</span>
+          <span class="obj-desc">Replicated pods with rollout</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create deployment</span> <span class="val">my-deploy</span> <span class="fl">--image</span>=nginx <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--image</span>=nginx:1.25</span>
+            <span class="flag-pill"><span class="flag-key">--replicas</span>=3</span>
+            <span class="flag-pill"><span class="flag-key">--port</span>=8080</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="job batch run-to-completion busybox">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-teal">Job</span>
+          <span class="obj-name">job</span>
+          <span class="obj-desc">Run-to-completion workload</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create job</span> <span class="val">my-job</span> <span class="fl">--image</span>=busybox <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">From CronJob</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create job</span> <span class="val">my-job</span> <span class="fl">--from</span>=cronjob/my-cj <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--image</span>=busybox</span>
+            <span class="flag-pill"><span class="flag-key">--from</span>=cronjob/my-cj</span>
+          </div>
+          <p class="note">Append <code>-- /bin/sh -c "echo hello"</code> to specify the container command.</p>
+        </div>
+      </div>
+
+      <div class="card" data-tags="cronjob schedule cron periodic job">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-teal">CronJob</span>
+          <span class="obj-name">cronjob</span>
+          <span class="obj-desc">Scheduled jobs</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create cronjob</span> <span class="val">my-cj</span> <span class="fl">--image</span>=busybox <span class="fl">--schedule</span>="*/1 * * * *" <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--schedule</span>="0 * * * *"</span>
+            <span class="flag-pill"><span class="flag-key">--image</span>=busybox</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Networking ── -->
+    <section class="section" id="networking">
+      <div class="section-header">
+        <span class="section-title">Networking</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="card" data-tags="service svc clusterip nodeport loadbalancer expose tcp port">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-amber">Service</span>
+          <span class="obj-name">service</span>
+          <span class="obj-desc">Expose pods via stable IP</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">ClusterIP (default)</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create service clusterip</span> <span class="val">my-svc</span> <span class="fl">--tcp</span>=80:8080 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">NodePort</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create service nodeport</span> <span class="val">my-svc</span> <span class="fl">--tcp</span>=80:8080 <span class="fl">--node-port</span>=30080 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">LoadBalancer</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create service loadbalancer</span> <span class="val">my-svc</span> <span class="fl">--tcp</span>=80:8080 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Expose from deployment</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl expose deployment</span> <span class="val">my-deploy</span> <span class="fl">--port</span>=80 <span class="fl">--target-port</span>=8080 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--tcp</span>=port:targetPort</span>
+            <span class="flag-pill"><span class="flag-key">--node-port</span>=30000</span>
+            <span class="flag-pill"><span class="flag-key">--type</span>=ClusterIP|NodePort|LoadBalancer</span>
+            <span class="flag-pill"><span class="flag-key">--selector</span>=app=web</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="ingress rule host path tls http routing">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-amber">Ingress</span>
+          <span class="obj-name">ingress</span>
+          <span class="obj-desc">HTTP routing rules</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create ingress</span> <span class="val">my-ing</span> <span class="fl">--rule</span>="host/path=svc:port" <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">With TLS</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create ingress</span> <span class="val">my-ing</span> <span class="fl">--rule</span>="foo.com/=svc:80,tls=my-secret" <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Default backend</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create ingress</span> <span class="val">my-ing</span> <span class="fl">--default-backend</span>=svc:80 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Config & Storage ── -->
+    <section class="section" id="config">
+      <div class="section-header">
+        <span class="section-title">Config &amp; Storage</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="card" data-tags="configmap cm config literal file env">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-coral">ConfigMap</span>
+          <span class="obj-name">configmap</span>
+          <span class="obj-desc">Non-sensitive config data</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">From literal</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create configmap</span> <span class="val">my-cm</span> <span class="fl">--from-literal</span>=key=value <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">From file</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create configmap</span> <span class="val">my-cm</span> <span class="fl">--from-file</span>=./config.conf <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">From env file</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create configmap</span> <span class="val">my-cm</span> <span class="fl">--from-env-file</span>=.env <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">From directory</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create configmap</span> <span class="val">my-cm</span> <span class="fl">--from-file</span>=./configs/ <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="secret generic password tls docker registry base64 sensitive">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-coral">Secret</span>
+          <span class="obj-name">secret</span>
+          <span class="obj-desc">Sensitive data (base64 encoded)</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Generic</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create secret generic</span> <span class="val">my-secret</span> <span class="fl">--from-literal</span>=password=abc123 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">From file</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create secret generic</span> <span class="val">my-secret</span> <span class="fl">--from-file</span>=./credentials <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Docker registry</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create secret docker-registry</span> <span class="val">my-reg</span> <span class="fl">--docker-server</span>=registry.io <span class="fl">--docker-username</span>=user <span class="fl">--docker-password</span>=pass <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">TLS</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create secret tls</span> <span class="val">my-tls</span> <span class="fl">--cert</span>=tls.crt <span class="fl">--key</span>=tls.key <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── RBAC ── -->
+    <section class="section" id="rbac">
+      <div class="section-header">
+        <span class="section-title">RBAC</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="card" data-tags="serviceaccount sa identity pod api access">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-purple">SA</span>
+          <span class="obj-name">serviceaccount</span>
+          <span class="obj-desc">Pod identity for API access</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create serviceaccount</span> <span class="val">my-sa</span> <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="role rbac verb resource namespace permissions get list watch create">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-purple">Role</span>
+          <span class="obj-name">role</span>
+          <span class="obj-desc">Namespace-scoped permissions</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create role</span> <span class="val">my-role</span> <span class="fl">--verb</span>=get,list,watch <span class="fl">--resource</span>=pods <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--verb</span>=get,list,watch,create,update,patch,delete</span>
+            <span class="flag-pill"><span class="flag-key">--resource</span>=pods,services,deployments</span>
+            <span class="flag-pill"><span class="flag-key">--resource-name</span>=my-pod</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="clusterrole cluster-wide permissions nodes global">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-purple">ClusterRole</span>
+          <span class="obj-name">clusterrole</span>
+          <span class="obj-desc">Cluster-wide permissions</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create clusterrole</span> <span class="val">my-cr</span> <span class="fl">--verb</span>=get,list <span class="fl">--resource</span>=nodes <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Aggregation rule</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create clusterrole</span> <span class="val">my-cr</span> <span class="fl">--aggregation-rule</span>="rbac.example.com/aggregate-to-admin=true" <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="rolebinding bind role subject user group serviceaccount">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-purple">RoleBinding</span>
+          <span class="obj-name">rolebinding</span>
+          <span class="obj-desc">Bind role to a subject</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Bind to ServiceAccount</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create rolebinding</span> <span class="val">my-rb</span> <span class="fl">--role</span>=my-role <span class="fl">--serviceaccount</span>=default:my-sa <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Bind to User</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create rolebinding</span> <span class="val">my-rb</span> <span class="fl">--clusterrole</span>=view <span class="fl">--user</span>=jane <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--role</span>=my-role</span>
+            <span class="flag-pill"><span class="flag-key">--clusterrole</span>=view</span>
+            <span class="flag-pill"><span class="flag-key">--serviceaccount</span>=ns:sa-name</span>
+            <span class="flag-pill"><span class="flag-key">--user</span>=jane</span>
+            <span class="flag-pill"><span class="flag-key">--group</span>=devs</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="clusterrolebinding crb cluster bind global serviceaccount">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-purple">CRB</span>
+          <span class="obj-name">clusterrolebinding</span>
+          <span class="obj-desc">Bind clusterrole cluster-wide</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create clusterrolebinding</span> <span class="val">my-crb</span> <span class="fl">--clusterrole</span>=my-cr <span class="fl">--serviceaccount</span>=default:my-sa <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Bind to User</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create clusterrolebinding</span> <span class="val">my-crb</span> <span class="fl">--clusterrole</span>=cluster-admin <span class="fl">--user</span>=admin <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Namespace & Quota ── -->
+    <section class="section" id="namespace">
+      <div class="section-header">
+        <span class="section-title">Namespace &amp; Quota</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="card" data-tags="namespace ns partition isolation">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-green">Namespace</span>
+          <span class="obj-name">namespace</span>
+          <span class="obj-desc">Logical cluster partition</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create namespace</span> <span class="val">my-ns</span> <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="resourcequota quota hard cpu memory pods limit namespace">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-green">ResourceQuota</span>
+          <span class="obj-name">resourcequota</span>
+          <span class="obj-desc">Limit namespace resources</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Dry-run command</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create quota</span> <span class="val">my-quota</span> <span class="fl">--hard</span>=cpu=1,memory=1Gi,pods=10 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--hard</span>=cpu=2,memory=4Gi</span>
+            <span class="flag-pill"><span class="flag-key">--hard</span>=pods=20,services=5</span>
+            <span class="flag-pill"><span class="flag-key">--hard</span>=persistentvolumeclaims=4</span>
+            <span class="flag-pill"><span class="flag-key">--scopes</span>=BestEffort</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-tags="pdb poddisruptionbudget disruption availability selector min max">
+        <div class="card-header" onclick="toggleCard(this.parentElement)">
+          <span class="badge b-green">PDB</span>
+          <span class="obj-name">poddisruptionbudget</span>
+          <span class="obj-desc">Limit voluntary disruptions</span>
+          <span class="chevron">▼</span>
+        </div>
+        <div class="card-body">
+          <div class="cmd-label">Min available</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create pdb</span> <span class="val">my-pdb</span> <span class="fl">--selector</span>=app=web <span class="fl">--min-available</span>=2 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Max unavailable</div>
+          <div class="cmd-block">
+            <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+            <span class="kw">kubectl create pdb</span> <span class="val">my-pdb</span> <span class="fl">--selector</span>=app=web <span class="fl">--max-unavailable</span>=1 <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml
+          </div>
+          <div class="cmd-label">Useful flags</div>
+          <div class="flags">
+            <span class="flag-pill"><span class="flag-key">--selector</span>=app=web</span>
+            <span class="flag-pill"><span class="flag-key">--min-available</span>=1</span>
+            <span class="flag-pill"><span class="flag-key">--max-unavailable</span>=1</span>
+            <span class="flag-pill"><span class="flag-key">--min-available</span>=50%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Pro Tip ── -->
+    <section class="section" id="tip">
+      <div class="section-header">
+        <span class="section-title">Pro tip</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="tip-card">
+        <div class="tip-title">⚡ Save to file → edit → apply</div>
+        <div class="cmd-label">Generate scaffold</div>
+        <div class="cmd-block">
+          <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+          <span class="kw">kubectl create deployment</span> <span class="val">my-deploy</span> <span class="fl">--image</span>=nginx <span class="fl">--dry-run</span>=client <span class="fl">-o</span> yaml <span class="fl">&gt;</span> <span class="val">deploy.yaml</span>
+        </div>
+        <div class="cmd-label">Edit YAML, then apply</div>
+        <div class="cmd-block">
+          <button class="copy-btn" onclick="copyCmd(this)">copy</button>
+          <span class="kw">kubectl apply</span> <span class="fl">-f</span> <span class="val">deploy.yaml</span>
+        </div>
+        <p class="tip-note">Works for ALL objects above. Pipe output to a file, customize the YAML (add env vars, volumes, resource limits, etc.), then apply. Great for CKA/CKAD exams — much faster than writing YAML from scratch.</p>
+      </div>
+
+      <div style="margin-top:14px; padding: 14px 16px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;">
+        <div class="tip-title" style="color: var(--text3);">⚠ Objects NOT supported imperatively</div>
+        <div class="flags" style="margin-top: 4px;">
+          <span class="flag-pill" style="color:var(--text3);">StatefulSet</span>
+          <span class="flag-pill" style="color:var(--text3);">DaemonSet</span>
+          <span class="flag-pill" style="color:var(--text3);">PersistentVolume</span>
+          <span class="flag-pill" style="color:var(--text3);">PersistentVolumeClaim</span>
+          <span class="flag-pill" style="color:var(--text3);">HorizontalPodAutoscaler</span>
+          <span class="flag-pill" style="color:var(--text3);">NetworkPolicy</span>
+          <span class="flag-pill" style="color:var(--text3);">LimitRange</span>
+        </div>
+        <p class="note" style="margin-top:10px;">Use <code>kubectl explain &lt;resource&gt;</code> to browse fields, or copy from the official docs.</p>
+      </div>
+    </section>
+
+    <div id="empty">No objects match your search.</div>
+
+  </main>
+</div>
+
+<script>
+// ── Toggle card ──
+function toggleCard(card) {
+  card.classList.toggle('open');
+}
+
+// ── Copy command ──
+function copyCmd(btn) {
+  const block = btn.nextElementSibling || btn.parentElement;
+  const text = block.innerText.replace(/^copy\s*/, '').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1600);
+  });
+}
+
+// ── Search ──
+const searchInput = document.getElementById('search');
+const cards = document.querySelectorAll('.card');
+const sections = document.querySelectorAll('.section');
+const emptyState = document.getElementById('empty');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase().trim();
+  let anyVisible = false;
+
+  cards.forEach(card => {
+    const tags = (card.dataset.tags || '').toLowerCase();
+    const text = card.innerText.toLowerCase();
+    const match = !q || tags.includes(q) || text.includes(q);
+    card.classList.toggle('hidden', !match);
+    if (match) { anyVisible = true; if (q) card.classList.add('open'); }
+  });
+
+  sections.forEach(sec => {
+    const visibleCards = sec.querySelectorAll('.card:not(.hidden)');
+    sec.style.display = visibleCards.length ? '' : 'none';
+  });
+
+  emptyState.style.display = anyVisible ? 'none' : 'block';
+});
+
+// ── Expand/Collapse all ──
+let allExpanded = false;
+document.getElementById('expand-btn').addEventListener('click', function() {
+  allExpanded = !allExpanded;
+  cards.forEach(c => c.classList.toggle('open', allExpanded));
+  this.title = allExpanded ? 'Collapse all' : 'Expand all';
+  this.textContent = allExpanded ? '⊟' : '⊞';
+});
+
+// ── Theme toggle ──
+const themeBtn = document.getElementById('theme-btn');
+let theme = localStorage.getItem('theme') || 'dark';
+applyTheme(theme);
+
+themeBtn.addEventListener('click', () => {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', theme);
+  applyTheme(theme);
+});
+
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  themeBtn.textContent = t === 'dark' ? '☀' : '☾';
+}
+
+// ── Active nav on scroll ──
+const navItems = document.querySelectorAll('.nav-item');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navItems.forEach(n => n.classList.remove('active'));
+      const match = document.querySelector(`.nav-item[href="#${e.target.id}"]`);
+      if (match) match.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
